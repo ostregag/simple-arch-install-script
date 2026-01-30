@@ -36,9 +36,14 @@ subprocess.run(
 #else: 
 #    print ("wrong")
 #    exit()
-call(f"mkfs.ext4 /dev/{disk}2", shell=True)
-call(f"mkfs.fat -F32 /dev/{disk}1", shell=True)
-call(f"mkswap /dev/{disk}3", shell=True)
+if "nvme" in disk:
+    call(f"mkfs.ext4 /dev/{disk}p2", shell=True)
+    call(f"mkfs.fat -F32 /dev/{disk}p1", shell=True)
+    call(f"mkswap /dev/{disk}p3", shell=True)
+else:
+    call(f"mkfs.ext4 /dev/{disk}2", shell=True)
+    call(f"mkfs.fat -F32 /dev/{disk}1", shell=True)
+    call(f"mkswap /dev/{disk}3", shell=True)
 
 call(f"mount /dev/{disk}2 /mnt", shell=True)
 call(f"mount --mkdir /dev/{disk}1 /mnt/boot", shell=True)
