@@ -11,7 +11,10 @@ while type not in ("mbr", "gpt"):
     type = str(input("partition type mbr or gpt?: "))
 
 timezone = str(input("Type in your time zone city, e.g: Europe/Warsaw: "))
-locale = (input("input your locale, e.g en_US.UTF-8, pl_PL.UTF-8 UTF-8: "))
+locale = (input("input your locale, e.g: pl_PL.UTF-8 UTF-8(leave empty for english): "))
+if (len(locale) == 0):
+    locale = "en_US.UTF-8 UTF-8"
+
 keymap = str(input("Type in your keymap, e.g pl, de-latin1: "))
 hostname = str(input("type in your machine hostname: "))
 
@@ -40,6 +43,8 @@ if wheel_user == "y":
     else:
         root_lock = ""
         root_lock_command = ""
+else:
+    root_lock = ""
 if type == "gpt":
     sfdisk_input = f"""label: gpt
     size=1G type=U
@@ -128,12 +133,13 @@ if (len(add_username) > 0):
 if (wheel_user == "y"):
     subprocess.run(["arch-chroot", "/mnt", "/bin/bash", "-c", f"usermod -aG wheel {add_username}"],  text=True)
     subprocess.run(["arch-chroot", "/mnt", "/bin/bash", "-c", "echo '%wheel ALL=(ALL:ALL) ALL' >> /etc/sudoers"],  text=True)
-if root_lock == "y":
+if (root_lock == "y"):
     subprocess.run(["arch-chroot", "/mnt", "/bin/bash", "-c", f"{root_lock_command}"],  text=True)
 
 
+
 call("umount -R /mnt", shell=True)
-call("reboot")
+call("reboot", shell=True)
 
 
 
