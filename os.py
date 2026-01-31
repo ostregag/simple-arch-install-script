@@ -11,6 +11,7 @@ while type not in ("mbr", "gpt"):
     type = str(input("partition type mbr or gpt?: "))
 
 timezone = str(input("Type in your time zone city, e.g: Europe/Warsaw: "))
+locale = (input("input your locale, e.g en_US.UTF-8, pl_PL.UTF-8 UTF-8: "))
 keymap = str(input("Type in your keymap, e.g pl, de-latin1: "))
 hostname = str(input("type in your machine hostname: "))
 
@@ -18,24 +19,27 @@ root_passwd = getpass("set your root password(hidden): ")
 add_username = str(input("add another user? Leave empty if youre not adding a user: "))
 if (len(add_username) > 0):
     user_passwd = getpass(f"set password for {add_username}: ")
+    wheel_user = str(input("do your want to add the user to the wheel group? [y/n]: "))
     dm = str(input("do you want to install plasma? [y/n]: "))
+
 
     if dm == "y":
         dm_command = """
-        pacman -S plasma sddm --noconfirm
+        pacman -S plasma sddm kde-applications --noconfirm
         systemctl enable sddm"""
 else:
     user_passwd =""
     dm_command = ""
     dm = ""
-if (len(add_username) > 0):
-    wheel_user = str(input("do your want to add the user to the wheel group? [y/n]: "))
-else:
     wheel_user = "n"
-
-
-#call(f"sfdisk /dev/{disk}", shell=True)
-#if type == "gpt":
+if wheel_user == "y":
+    root_lock = input(f"you have created another user ({add_username}) and gave them sudo rights, do you want to lock the root account? [y/n]: ")
+    if root_lock == "y":
+        root_lock_command = """
+        passwd -l root"""
+    else:
+        root_lock = ""
+        root_lock_command = ""
 if type == "gpt":
     sfdisk_input = f"""label: gpt
     size=1G type=U
@@ -52,7 +56,6 @@ if type == "gpt":
 
 elif type == "mbr":
     sfdisk_input = f"""label: mbr
-    size=1G type=U
     size={main_size}G, type=L
     type=S
     """
@@ -66,30 +69,47 @@ elif type == "mbr":
 else:
     grub_gpt = ""
     grub_mbr = ""
+if type == "gpt":
+    if "nvme" in disk:
+        call(f"mkfs.ext4 /dev/{disk}p2", shell=True)
+        call(f"mkfs.fat -F32 /dev/{disk}p1", shell=True)
+        call(f"mkswap /dev/{disk}p3", shell=True)
+        call(f"mount /dev/{disk}p2 /mnt", shell=True)
+        call(f"mount --mkdir /dev/{disk}p1 /mnt/boot", shell=True)
+        call(f"swapon /dev/{disk}p3", shell=True)
+    else:
+        call(f"mkfs.ext4 /dev/{disk}2", shell=True)
+        call(f"mkfs.fat -F32 /dev/{disk}1", shell=True)
+        call(f"mkswap /dev/{disk}3", shell=True)
+        call(f"mount /dev/{disk}2 /mnt", shell=True)
+        call(f"mount --mkdir /dev/{disk}1 /mnt/boot", shell=True)
+        call(f"swapon /dev/{disk}3", shell=True)
+if type == "mbr":
+    if "nvme" in disk:
+        call(f"mkfs.ext4 /dev/{disk}p1", shell=True)
+        call(f"mkswap /dev/{disk}p2", shell=True)
+        call(f"mount /dev/{disk}p1 /mnt", shell=True)
+        call(f"swapon /dev/{disk}p2", shell=True)
+    else:
+        call(f"mkfs.ext4 /dev/{disk}1", shell=True)
+        call(f"mkswap /dev/{disk}2", shell=True)
+        call(f"mount /dev/{disk}1 /mnt", shell=True)
+        call(f"swapon /dev/{disk}2", shell=True)
 
-if "nvme" in disk:
-    call(f"mkfs.ext4 /dev/{disk}p2", shell=True)
-    call(f"mkfs.fat -F32 /dev/{disk}p1", shell=True)
-    call(f"mkswap /dev/{disk}p3", shell=True)
-else:
-    call(f"mkfs.ext4 /dev/{disk}2", shell=True)
-    call(f"mkfs.fat -F32 /dev/{disk}1", shell=True)
-    call(f"mkswap /dev/{disk}3", shell=True)
-
-call(f"mount /dev/{disk}2 /mnt", shell=True)
-call(f"mount --mkdir /dev/{disk}1 /mnt/boot", shell=True)
-call(f"swapon /dev/{disk}3", shell=True)
 subprocess.run(["pacman", "-Syu"], input="n\n", text=True)
 call("pacman -S archlinux-keyring --noconfirm", shell=True)
 call(f"pacstrap -K /mnt base linux linux-firmware", shell=True)
 call("genfstab -U /mnt >> /mnt/etc/fstab", shell=True)
 chroot_commands = f"""
 echo 'KEYMAP={keymap}' >> /etc/vconsole.conf
+echo 'LANG={locale.split()[0]}' >> /etc/locale.conf
+echo '{locale}' >> /etc/locale.gen
+locale-gen
 ln -sf /usr/share/zoneinfo/{timezone} /etc/localtime
 hwclock --systohc
 echo {hostname} >> /etc/hostname
 mkinitcpio -P
-pacman -S vim nano btop sudo grub efibootmgr networkmanager bash-completion htop btop --noconfirm
+pacman -S vim nano btop sudo grub efibootmgr networkmanager bash-completion htop --noconfirm
 systemctl enable NetworkManager
 """
 
@@ -108,7 +128,10 @@ if (len(add_username) > 0):
 if (wheel_user == "y"):
     subprocess.run(["arch-chroot", "/mnt", "/bin/bash", "-c", f"usermod -aG wheel {add_username}"],  text=True)
     subprocess.run(["arch-chroot", "/mnt", "/bin/bash", "-c", "echo '%wheel ALL=(ALL:ALL) ALL' >> /etc/sudoers"],  text=True)
-call("exit", shell=True)
+if root_lock == "y":
+    subprocess.run(["arch-chroot", "/mnt", "/bin/bash", "-c", f"{root_lock_command}"],  text=True)
+
+
 call("umount -R /mnt", shell=True)
 call("reboot")
 
